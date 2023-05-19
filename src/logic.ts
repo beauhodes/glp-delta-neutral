@@ -9,14 +9,12 @@ import { eacAggregatorProxyAbi } from "./abis/eacAggregatorProxyAbi";
 export const rebalance = async (
     maxExpectedGlpOwnedUsd: number,
     currentShortSizeEth: number,
-    currentShortSizeBtc: number,
     overrideGlpOwned?: number
 ): Promise<{
     blockDate: Date;
     glpPriceUsd: number;
     ownedGlpValueUsd: number;
     ethShortSizeUsd: number;
-    btcShortSizeUsd: number;
 }> => {
     try {
         // Config
@@ -24,11 +22,6 @@ export const rebalance = async (
         const arbitrumProvider = new ethers.providers.JsonRpcProvider(arbitrumRpcUrl);
         const ethOracle = new ethers.Contract(
             "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
-            eacAggregatorProxyAbi,
-            mainnetProvider
-        );
-        const btcOracle = new ethers.Contract(
-            "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c",
             eacAggregatorProxyAbi,
             mainnetProvider
         );
@@ -54,7 +47,6 @@ export const rebalance = async (
         promises.push(feeStakedGlp.balanceOf(address)); // GLP balance
         promises.push(glpManager.getPrice(true)); // GLP price
         promises.push(ethOracle.latestAnswer()); // ETH price
-        promises.push(btcOracle.latestAnswer()); // BTC price
         promises.push(usdg.totalSupply()); // USDG supply
         for (const [_tokenName, tokenAddress] of Object.entries(tokenAddresses)) {
             promises.push(glpVault.usdgAmounts(tokenAddress));
@@ -64,7 +56,6 @@ export const rebalance = async (
             glpOwned,
             glpPrice,
             ethPrice,
-            btcPrice,
             totalUsdgSupply,
             ethUsdgSupply,
             wbtcUsdgSupply,
@@ -77,7 +68,7 @@ export const rebalance = async (
         ] = await Promise.all(promises);
         if (overrideGlpOwned) {
             // Override GLP owned for testing
-            glpOwned = ethers.BigNumber.from(overrideGlpOwned);
+            glpOwned = ethers.utils.parseEther(overrideGlpOwned.toString());
         }
 
         /* 
@@ -89,7 +80,6 @@ export const rebalance = async (
         */
         const blockDate = new Date(latestBlock.timestamp * 1000);
         const ethPriceUsd = parseFloat(ethPrice.toString()) / 1e8;
-        const btcPriceUsd = parseFloat(btcPrice.toString()) / 1e8;
         const totalUsdcSupplyParsed = parseFloat(ethers.utils.formatEther(totalUsdgSupply));
         const glpPriceUsd = parseFloat(ethers.utils.formatEther(glpPrice)) / 1e12;
         const glpOwnedNormalized = parseFloat(ethers.utils.formatEther(glpOwned));
@@ -112,13 +102,11 @@ export const rebalance = async (
 
         // Calculate how much we need to short
         // For LINK and UNI, we multiply by 1.2x to account for volatility against ETH, and batch with ETH
-        const ethWeights = tokenWeights.eth + tokenWeights.linkAndUni * 1.2;
-        const btcWeights = tokenWeights.wbtc;
+        // For BTC, we multiply by 0.98x to account for slightly lower volatility against ETH, and batch with ETH
+        const ethWeights = tokenWeights.eth + tokenWeights.linkAndUni * 1.2 + tokenWeights.wbtc * 0.98;
         const stablecoinWeights = tokenWeights.stables;
         const ethShortSizeUsd = ethWeights * ownedGlpValueUsd;
-        const btcShortSizeUsd = btcWeights * ownedGlpValueUsd;
         const ethShortSizeEth = ethShortSizeUsd / ethPriceUsd;
-        const btcShortSizeBtc = btcShortSizeUsd / btcPriceUsd;
 
         // Double-checks (date, GLP owned size, weight ranges, short sizes)
         runDoubleChecks(
@@ -126,19 +114,12 @@ export const rebalance = async (
             maxExpectedGlpOwnedUsd,
             ownedGlpValueUsd,
             ethWeights,
-            btcWeights,
             stablecoinWeights,
             ethShortSizeUsd,
-            btcShortSizeUsd,
-            ethPriceUsd,
-            btcPriceUsd
+            ethPriceUsd
         );
 
-        // Check to see if we should execute trades - only if the amount of ETH/BTC shorted is +- 10% of the current short sizes
-        let doRebalanceBtc = false;
-        if (btcShortSizeBtc > currentShortSizeBtc * 1.1 || btcShortSizeBtc < currentShortSizeBtc * 0.9) {
-            doRebalanceBtc = true;
-        }
+        // Check to see if we should execute trades - only if the amount of ETH shorted is +- 10% of the current short sizes
         let doRebalanceEth = false;
         if (ethShortSizeEth > currentShortSizeEth * 1.1 || ethShortSizeEth < currentShortSizeEth * 0.9) {
             doRebalanceEth = true;
@@ -148,20 +129,15 @@ export const rebalance = async (
         console.log("\n==================== OUTPUT ====================");
         console.log(`- Block date: ${blockDate}`);
         console.log(`- ETH price: ${ethPriceUsd}`);
-        console.log(`- BTC price: ${btcPriceUsd}`);
         console.log(`- GLP price: ${glpPriceUsd}`);
-        console.log(`- $ ETH+UNI+LINK GLP weight: ${ethWeights}`);
-        console.log(`- $ BTC GLP weight: ${btcWeights}`);
+        console.log(`- $ ETH+UNI+LINK+WBTC GLP weight: ${ethWeights}`);
         console.log(`- $ Stablecoin GLP weight: ${stablecoinWeights}`);
         console.log(`- $ GLP owned: $${ownedGlpValueUsd}`);
         console.log("\n");
         console.log(`- Intended ETH short: $${ethShortSizeUsd} (${ethShortSizeEth} ETH)`);
         console.log(`- Current ETH short: $${currentShortSizeEth * ethPriceUsd} (${currentShortSizeEth} ETH)`);
-        console.log(`- Intended BTC short: $${btcShortSizeUsd} (${btcShortSizeBtc} BTC)`);
-        console.log(`- Current BTC short: $${currentShortSizeBtc * btcPriceUsd} (${currentShortSizeBtc} ETH)`);
         console.log("\n");
         console.log(`- Rebalance ETH short? ${doRebalanceEth ? "YES" : "No"}`);
-        console.log(`- Rebalance BTC short? ${doRebalanceBtc ? "YES" : "No"}`);
         console.log("================================================\n");
 
         return {
@@ -169,7 +145,6 @@ export const rebalance = async (
             glpPriceUsd,
             ownedGlpValueUsd,
             ethShortSizeUsd,
-            btcShortSizeUsd
         };
     } catch (err) {
         let reasonMsg: string;
@@ -188,12 +163,9 @@ function runDoubleChecks(
     maxExpectedGlpOwnedUsd: number,
     ownedGlpValueUsd: number,
     ethWeights: number,
-    btcWeights: number,
     stablecoinWeights: number,
     ethShortSizeUsd: number,
-    btcShortSizeUsd: number,
-    ethPriceUsd: number,
-    btcPriceUsd: number
+    ethPriceUsd: number
 ) {
     const curDate = new Date();
     if (Math.abs(curDate.getTime() - blockDate.getTime()) > 120000) {
@@ -204,14 +176,9 @@ function runDoubleChecks(
             `ERROR: GLP owned value is $${ownedGlpValueUsd}, which is greater than max expected value of $${maxExpectedGlpOwnedUsd}`
         );
     }
-    if (ethWeights < expectedWeightRanges.ethLinkUni.min || ethWeights > expectedWeightRanges.ethLinkUni.max) {
+    if (ethWeights < expectedWeightRanges.ethLinkUniBtc.min || ethWeights > expectedWeightRanges.ethLinkUniBtc.max) {
         throw new Error(
-            `ERROR: ETH+LINK+UNI weight is ${ethWeights}, which is not within expected range of ${expectedWeightRanges.ethLinkUni.min} to ${expectedWeightRanges.ethLinkUni.max}`
-        );
-    }
-    if (btcWeights < expectedWeightRanges.wbtc.min || btcWeights > expectedWeightRanges.wbtc.max) {
-        throw new Error(
-            `ERROR: WBTC weight is ${btcWeights}, which is not within expected range of ${expectedWeightRanges.wbtc.min} to ${expectedWeightRanges.wbtc.max}`
+            `ERROR: ETH+LINK+UNI weight is ${ethWeights}, which is not within expected range of ${expectedWeightRanges.ethLinkUniBtc.min} to ${expectedWeightRanges.ethLinkUniBtc.max}`
         );
     }
     if (stablecoinWeights < expectedWeightRanges.stables.min || stablecoinWeights > expectedWeightRanges.stables.max) {
@@ -219,21 +186,14 @@ function runDoubleChecks(
             `ERROR: Stablecoin weight is ${stablecoinWeights}, which is not within expected range of ${expectedWeightRanges.stables.min} to ${expectedWeightRanges.stables.max}`
         );
     }
-    if (ethShortSizeUsd > ownedGlpValueUsd * expectedWeightRanges.ethLinkUni.max) {
+    if (ethShortSizeUsd > ownedGlpValueUsd * expectedWeightRanges.ethLinkUniBtc.max) {
         throw new Error(
             `ERROR: ETH short size is $${ethShortSizeUsd}, which is greater than max expected value of $${
-                ownedGlpValueUsd * expectedWeightRanges.ethLinkUni.max
+                ownedGlpValueUsd * expectedWeightRanges.ethLinkUniBtc.max
             }`
         );
     }
-    if (btcShortSizeUsd > ownedGlpValueUsd * expectedWeightRanges.wbtc.max) {
-        throw new Error(
-            `ERROR: BTC short size is $${btcShortSizeUsd}, which is greater than max expected value of $${
-                ownedGlpValueUsd * expectedWeightRanges.wbtc.max
-            }`
-        );
-    }
-    if (!ethPriceUsd || !btcPriceUsd) {
-        throw new Error(`ERROR: No ETH or BTC price found`);
+    if (!ethPriceUsd) {
+        throw new Error(`ERROR: No ETH price found`);
     }
 }

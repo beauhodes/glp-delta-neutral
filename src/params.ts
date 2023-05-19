@@ -10,9 +10,6 @@ export const maxExpectedGlpOwnedUsd: number = process.env.MAX_EXPECTED_GLP_OWNED
 export const currentShortSizeEth: number = process.env.CURRENT_SHORT_SIZE_ETH
     ? parseFloat(process.env.CURRENT_SHORT_SIZE_ETH)
     : 0;
-export const currentShortSizeBtc: number = process.env.CURRENT_SHORT_SIZE_BTC
-    ? parseFloat(process.env.CURRENT_SHORT_SIZE_BTC)
-    : 0;
 export const overrideGlpOwned: number | undefined = process.env.OVERRIDE_GLP_OWNED
     ? parseFloat(process.env.OVERRIDE_GLP_OWNED)
     : undefined;
@@ -29,13 +26,9 @@ export const tokenAddresses = {
 };
 
 export const expectedWeightRanges = {
-    ethLinkUni: {
-        min: 0.19,
-        max: 0.45
-    },
-    wbtc: {
-        min: 0.15,
-        max: 0.35
+    ethLinkUniBtc: {
+        min: 0.34,
+        max: 0.8
     },
     stables: {
         min: 0.35,
