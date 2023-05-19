@@ -144,7 +144,7 @@ export const rebalance = async (
             blockDate,
             glpPriceUsd,
             ownedGlpValueUsd,
-            ethShortSizeUsd,
+            ethShortSizeUsd
         };
     } catch (err) {
         let reasonMsg: string;
