@@ -1,0 +1,32 @@
+{
+  "name": "glp-delta-neutral",
+  "version": "1.0.0",
+  "description": "",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "dist/entry.js",
+  "scripts": {
+    "calcs": "npm run build && npx ts-node src/execute.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "prettier:check": "npx prettier --check .",
+    "prettier:write": "npx prettier --write ."
+  },
+  "types": "lib/index.d.ts",
+  "devDependencies": {
+    "@types/node": "^20.2.1",
+    "typescript": "^5.0.4"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "ethers": "^5.7.2",
+    "prettier": "^2.8.8",
+    "ts-node": "^10.9.1"
+  }
+}
