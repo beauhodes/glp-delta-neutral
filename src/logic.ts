@@ -128,11 +128,11 @@ export const rebalance = async (
         // Log output
         console.log("\n==================== OUTPUT ====================");
         console.log(`- Block date: ${blockDate}`);
-        console.log(`- ETH price: ${ethPriceUsd}`);
-        console.log(`- GLP price: ${glpPriceUsd}`);
-        console.log(`- $ ETH+UNI+LINK+WBTC GLP weight: ${ethWeights}`);
-        console.log(`- $ Stablecoin GLP weight: ${stablecoinWeights}`);
-        console.log(`- $ GLP owned: $${ownedGlpValueUsd}`);
+        console.log(`- ETH price: $${ethPriceUsd}`);
+        console.log(`- GLP price: $${glpPriceUsd}`);
+        console.log(`- ETH+UNI+LINK+WBTC GLP weight: ${ethWeights}`);
+        console.log(`- Stablecoin GLP weight: ${stablecoinWeights}`);
+        console.log(`- GLP owned: $${ownedGlpValueUsd}`);
         console.log("\n");
         console.log(`- Intended ETH short: $${ethShortSizeUsd} (${ethShortSizeEth} ETH)`);
         console.log(`- Current ETH short: $${currentShortSizeEth * ethPriceUsd} (${currentShortSizeEth} ETH)`);
