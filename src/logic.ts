@@ -132,11 +132,9 @@ export const rebalance = async (
         console.log(`- GLP price: $${glpPriceUsd}`);
         console.log(`- ETH+UNI+LINK+WBTC GLP weight: ${ethWeights}`);
         console.log(`- Stablecoin GLP weight: ${stablecoinWeights}`);
-        console.log(`- GLP owned: $${ownedGlpValueUsd}`);
-        console.log("\n");
+        console.log(`- GLP owned: $${ownedGlpValueUsd}\n`);
         console.log(`- Intended ETH short: $${ethShortSizeUsd} (${ethShortSizeEth} ETH)`);
-        console.log(`- Current ETH short: $${currentShortSizeEth * ethPriceUsd} (${currentShortSizeEth} ETH)`);
-        console.log("\n");
+        console.log(`- Current ETH short: $${currentShortSizeEth * ethPriceUsd} (${currentShortSizeEth} ETH)\n`);
         console.log(`- Rebalance ETH short? ${doRebalanceEth ? "YES" : "No"}`);
         console.log("================================================\n");
 
